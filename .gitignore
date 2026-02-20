@@ -1,0 +1,15 @@
+# Dépendances PHP
+/vendor/
+composer.phar
+
+# Fichiers de configuration (Contiennent vos mots de passe !)
+config.php
+src/Graph/gds_analytics.py
+
+# Python
+__pycache__/
+*.pyc
+
+# Système
+.DS_Store
+Thumbs.db
