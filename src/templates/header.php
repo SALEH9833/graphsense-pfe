@@ -79,21 +79,26 @@ select { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
 <!-- HEADER PRO -->
 <header class="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-cyber-dark/80 backdrop-blur z-50">
     <div class="flex items-center gap-3">
-        <div class="w-8 h-8 rounded bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.3)]">
-            <span class="material-symbols-rounded text-black font-bold text-lg">hub</span>
+        <div class="w-8 h-8 rounded bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+            <span class="material-symbols-rounded text-black font-bold">hub</span>
         </div>
-        <div class="flex flex-col">
-            <h1 class="font-extrabold tracking-widest uppercase text-sm text-white">Graph<span class="text-primary glow-text">Sense</span></h1>
-            <span class="text-[10px] font-mono text-white/40 tracking-[0.2em] uppercase">Powered by GDS</span>
-        </div>
+        <h1 class="font-extrabold tracking-widest uppercase text-sm">Graph<span class="text-primary">Sense</span></h1>
     </div>
     
-    <nav class="flex p-1 bg-white/5 rounded-lg border border-white/5">
-        <?php $page = basename($_SERVER['PHP_SELF']); ?>
-        <a href="index.php" class="px-4 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all <?php echo $page=='index.php' ? 'bg-primary text-black shadow-lg shadow-primary/20' : 'text-white/40 hover:text-white'; ?>">1. Data</a>
-        <a href="visualize.php" class="px-4 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all <?php echo $page=='visualize.php' ? 'bg-primary text-black shadow-lg shadow-primary/20' : 'text-white/40 hover:text-white'; ?>">2. Graph</a>
-        <a href="metrics.php" class="px-4 py-1.5 rounded text-xs font-bold uppercase tracking-wider transition-all <?php echo $page=='metrics.php' ? 'bg-primary text-black shadow-lg shadow-primary/20' : 'text-white/40 hover:text-white'; ?>">3. Analytics</a>
-    </nav>
-</header>
+    <div class="flex items-center gap-6">
+        <nav class="flex p-1 bg-white/5 rounded-lg border border-white/5">
+            <?php $p = basename($_SERVER['PHP_SELF']); ?>
+            <a href="index.php" class="px-4 py-1.5 rounded text-xs font-bold transition <?php echo $p=='index.php' ? 'bg-primary text-black' : 'text-white/40'; ?>">1. Data</a>
+            <a href="visualize.php" class="px-4 py-1.5 rounded text-xs font-bold transition <?php echo $p=='visualize.php' ? 'bg-primary text-black' : 'text-white/40'; ?>">2. Graph</a>
+            <a href="metrics.php" class="px-4 py-1.5 rounded text-xs font-bold transition <?php echo $p=='metrics.php' ? 'bg-primary text-black' : 'text-white/40'; ?>">3. Analytics</a>
+        </nav>
+
+        <!-- BOUTON DÉCONNEXION -->
+        <a href="logout.php" class="flex items-center gap-2 text-white/30 hover:text-red-400 transition text-xs font-bold uppercase tracking-widest border-l border-white/10 pl-6">
+            <span>Quitter</span>
+            <span class="material-symbols-rounded text-lg">logout</span>
+        </a>
+    </div>
+</header>   
 
 <main class="flex-1 flex flex-col relative overflow-hidden p-4 md:p-6">

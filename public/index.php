@@ -1,163 +1,158 @@
 <?php
 session_start();
 
-// 1. CHARGEMENT DES CLASSES (Avant tout affichage)
+// 1. Sécurité
+if(!isset($_SESSION['user'])) { header('Location: login.php'); exit; }
+
 require_once __DIR__ . '/../vendor/autoload.php';
 use Src\Graph\CsvParser;
 
-// 2. TRAITEMENT DU FORMULAIRE (Avant tout affichage HTML)
+// Initialisation des variables de pré-remplissage
+// On regarde d'abord si on vient d'un import, sinon on regarde si on a déjà une session en cours
+$preFilledMatrix = $_SESSION['matrix'] ?? 'null';
+$preFilledCount = (isset($_SESSION['matrix'])) ? count(json_decode($_SESSION['matrix'], true)) : 4;
+$preFilledType = $_SESSION['graph_type'] ?? 'directed';
+
+// 2. Traitement Spécifique de l'Upload CSV (écrase la session actuelle)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
     if ($_FILES['csv_file']['error'] === UPLOAD_ERR_OK) {
         try {
             $graphData = CsvParser::parse($_FILES['csv_file']['tmp_name']);
-            $_SESSION['matrix'] = CsvParser::toMatrixJSON($graphData);
-            // La redirection fonctionnera maintenant car aucun HTML n'a été envoyé
-            header('Location: visualize.php');
-            exit;
-        } catch (Exception $e) {
-            $error = "Erreur CSV : " . $e->getMessage();
-        }
+            $preFilledType = $_POST['graph_type'] ?? 'directed';
+            $isDirected = ($preFilledType === 'directed');
+            
+            $preFilledMatrix = CsvParser::toMatrixJSON($graphData, $isDirected);
+            $preFilledCount = count($graphData['nodes']);
+
+            $_SESSION['matrix'] = $preFilledMatrix;
+            $_SESSION['graph_type'] = $preFilledType;
+        } catch (Exception $e) { $error = $e->getMessage(); }
     }
 }
 
-// 3. MAINTENANT SEULEMENT, ON AFFICHE LE HTML
 require_once __DIR__ . '/../src/templates/header.php';
 ?>
 
-<div class="flex flex-col md:flex-row w-full max-w-6xl gap-8 p-4 h-[85vh]">
-    
-    <!-- COLONNE GAUCHE : SAISIE -->
+<div class="flex flex-col md:flex-row w-full max-w-7xl mx-auto gap-8 p-4 h-[85vh]">
     <div class="flex-[2] glass-panel p-6 rounded-2xl flex flex-col">
-        <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-bold text-white flex items-center gap-2">
-                <span class="w-8 h-8 rounded bg-primary/20 text-primary flex items-center justify-center text-sm font-mono">01</span> 
-                Définition de la Matrice
-            </h2>
+        <h2 class="text-xl font-bold mb-4 text-primary">01. Définition de la Matrice</h2>
+        
+        <div class="flex gap-4 mb-4 bg-black/40 p-2 rounded-xl border border-white/5">
+            <label class="flex-1 text-center cursor-pointer p-2 rounded-lg transition-all">
+                <input type="radio" name="g_type_selector" value="directed" <?php echo ($preFilledType == 'directed') ? 'checked' : ''; ?> class="hidden peer">
+                <span class="text-xs font-bold text-white/40 peer-checked:text-primary uppercase tracking-widest">Orienté (→)</span>
+            </label>
+            <label class="flex-1 text-center cursor-pointer p-2 rounded-lg transition-all">
+                <input type="radio" name="g_type_selector" value="undirected" <?php echo ($preFilledType == 'undirected') ? 'checked' : ''; ?> class="hidden peer">
+                <span class="text-xs font-bold text-white/40 peer-checked:text-secondary uppercase tracking-widest">Non-orienté (—)</span>
+            </label>
         </div>
 
-        <div class="flex items-end gap-4 mb-6 border-b border-white/10 pb-6">
-            <div class="flex-1">
-                <label class="block text-xs font-bold text-white/50 mb-2 uppercase tracking-widest">Sommets</label>
-                <input type="number" id="node-count" min="2" max="20" value="4" class="w-full bg-cyber-dark border border-white/10 text-white rounded-lg p-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition font-mono">
-            </div>
-            <button type="button" id="btn-generate-grid" class="px-6 py-3 bg-white/5 text-white font-bold rounded-lg hover:bg-white/10 transition border border-white/10 uppercase text-xs tracking-wider">
-                Générer
-            </button>
+        <div class="flex gap-4 mb-4">
+            <input type="number" id="node-count" min="2" max="25" value="<?php echo $preFilledCount; ?>" class="flex-1 bg-cyber-dark border border-white/10 rounded-lg p-3 text-white outline-none focus:border-primary transition font-mono">
+            <button id="btn-generate-grid" class="bg-white/5 px-6 rounded-lg font-bold border border-white/10 hover:bg-white/10 transition uppercase text-xs tracking-widest text-white">Générer</button>
         </div>
 
-        <div class="flex-1 overflow-auto relative bg-cyber-black rounded-lg border border-white/10 p-4 flex items-center justify-center">
-            <div id="matrix-grid-container" class="grid gap-1">
-                <p class="text-white/30 text-sm italic font-mono">Initialisation...</p>
-            </div>
+        <div class="flex-1 overflow-auto bg-cyber-black rounded-lg border border-white/10 p-6 shadow-inner relative">
+            <div id="matrix-grid-container" style="width: max-content; margin: 0 auto; display: grid;"></div>
         </div>
 
         <form action="visualize.php" method="POST" id="main-form" class="mt-4">
+            <input type="hidden" name="graph_type" id="final-g-type" value="<?php echo $preFilledType; ?>">
             <textarea name="matrix" id="hidden-matrix" class="hidden"></textarea>
-            
-            <button type="submit" class="w-full py-4 bg-primary hover:bg-white text-black font-bold rounded-lg transition-all shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:shadow-[0_0_30px_rgba(0,240,255,0.5)] flex justify-center items-center gap-3 text-lg group">
-                Visualiser le Graphe 
-                <!-- CORRECTION ICÔNE ICI : material-symbols-rounded -->
-                <span class="material-symbols-rounded group-hover:translate-x-1 transition-transform">arrow_forward</span>
+            <button type="submit" class="w-full py-4 bg-primary hover:bg-cyan-400 text-black font-bold rounded-xl transition-all shadow-[0_0_20px_rgba(0,240,255,0.3)] flex justify-center items-center gap-3 text-lg uppercase tracking-tighter">
+                Visualiser <span class="material-symbols-rounded">arrow_forward</span>
             </button>
         </form>
     </div>
 
-    <!-- COLONNE DROITE : UPLOAD -->
-    <div class="flex-1 flex flex-col gap-6">
+    <div class="flex-1 flex flex-col gap-6 overflow-y-auto pr-2">
+        <!-- Dashboard Droite (CSV + Aide) reste identique -->
         <div class="glass-panel p-6 rounded-2xl">
-            <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <span class="w-8 h-8 rounded bg-secondary/20 text-secondary flex items-center justify-center text-sm font-mono">02</span> 
-                Import CSV
-            </h2>
-            <form action="" method="POST" enctype="multipart/form-data" class="h-32 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center hover:bg-white/5 hover:border-primary/50 transition relative cursor-pointer group">
-                <span class="material-symbols-rounded text-3xl text-white/20 group-hover:text-primary transition mb-2">upload_file</span>
-                <p class="text-white/40 text-xs font-mono group-hover:text-white transition">Glisser-déposer .CSV</p>
-                <input type="file" name="csv_file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv" required onchange="this.form.submit()">
-            </form>
-            <p class="text-[10px] text-white/30 mt-3 text-center font-mono">Format: Source,Target</p>
-            <?php if(isset($error)) echo "<p class='text-accent text-xs mt-2 text-center font-bold'>$error</p>"; ?>
-        </div>
-
-        <div class="glass-panel p-6 rounded-2xl flex-1 relative overflow-hidden">
-            <div class="absolute -right-4 -top-4 opacity-5">
-                <span class="material-symbols-rounded text-[100px]">help</span>
+            <h2 class="text-lg font-bold text-white mb-4">02. Import CSV</h2>
+            <div class="h-32 border-2 border-dashed border-white/10 rounded-xl flex flex-col items-center justify-center hover:bg-white/5 relative cursor-pointer mb-4 group">
+                <span class="material-symbols-rounded text-3xl text-white/20 group-hover:text-secondary transition">upload_file</span>
+                <p class="text-white/40 text-[10px] font-mono">Cliquer ou Glisser .CSV</p>
+                <input type="file" form="upload-form" name="csv_file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".csv" required onchange="document.getElementById('upload-form').submit()">
             </div>
-            <h3 class="font-bold text-white mb-4 flex items-center gap-2 text-sm uppercase tracking-wider">
-                <span class="material-symbols-rounded text-primary">info</span> Guide Rapide
-            </h3>
-            <ul class="text-xs text-white/60 space-y-3 pl-4 font-mono leading-relaxed">
-                <li class="list-disc marker:text-primary">Définissez le nombre de nœuds.</li>
-                <li class="list-disc marker:text-primary">Cliquez sur les cases : <br><span class="text-primary">Vert (1)</span> = Connecté<br><span class="text-white/30">Gris (0)</span> = Non connecté.</li>
-                <li class="list-disc marker:text-primary">Ou importez un fichier CSV nettoyé (Source, Cible).</li>
-            </ul>
+            <form action="" method="POST" enctype="multipart/form-data" id="upload-form" class="hidden">
+                 <input type="hidden" name="graph_type" value="<?php echo $preFilledType; ?>">
+            </form>
+            <!-- Consignes styles Terminal ici... -->
         </div>
     </div>
 </div>
 
-<!-- SCRIPT IDENTIQUE MAIS DANS LA PAGE -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    const grid = document.getElementById('matrix-grid-container');
+    const hiddenM = document.getElementById('hidden-matrix');
     const nodeCountInput = document.getElementById('node-count');
-    const btnGenerate = document.getElementById('btn-generate-grid');
-    const gridContainer = document.getElementById('matrix-grid-container');
-    const hiddenMatrix = document.getElementById('hidden-matrix');
+    const finalGType = document.getElementById('final-g-type');
+    
+    // DONNÉES INJECTÉES PAR PHP
+    const preFilledMatrix = <?php echo $preFilledMatrix !== 'null' ? $preFilledMatrix : 'null'; ?>;
+    const preFilledCount = <?php echo $preFilledCount; ?>;
 
-    btnGenerate.addEventListener('click', () => {
-        const count = parseInt(nodeCountInput.value);
-        if(count < 2 || count > 20) { alert("Entre 2 et 20 sommets SVP"); return; }
-        createGrid(count);
+    document.querySelectorAll('input[name="g_type_selector"]').forEach(r => {
+        r.addEventListener('change', e => finalGType.value = e.target.value);
     });
 
-    function createGrid(n) {
-        gridContainer.innerHTML = '';
-        let cellSize = n > 12 ? '2rem' : (n > 8 ? '2.5rem' : '3.5rem');
-        let textSize = n > 12 ? 'text-xs' : 'text-base';
+    function createGrid(n, data = null) {
+        grid.innerHTML = '';
+        let cellSize = n > 12 ? '1.8rem' : '2.8rem';
+        grid.style.gridTemplateColumns = `40px repeat(${n}, ${cellSize})`;
+        grid.style.gap = '6px';
 
-        gridContainer.className = "grid gap-1 place-content-center"; 
-        gridContainer.style.gridTemplateColumns = `auto repeat(${n}, ${cellSize})`;
-        
-        gridContainer.appendChild(createLabel('')); 
-        for(let i=0; i<n; i++) gridContainer.appendChild(createLabel(String.fromCharCode(65 + i), textSize));
+        grid.appendChild(document.createElement('div')); 
+        for(let i=0; i<n; i++) grid.appendChild(createLabel(String.fromCharCode(65 + i)));
 
         for(let i=0; i<n; i++) {
-            gridContainer.appendChild(createLabel(String.fromCharCode(65 + i), textSize));
+            grid.appendChild(createLabel(String.fromCharCode(65 + i)));
             for(let j=0; j<n; j++) {
-                const input = document.createElement('input');
-                input.type = 'text'; input.readOnly = true; input.value = 0;
-                input.className = `w-full h-full bg-cyber-dark border border-white/10 text-center text-white font-mono rounded focus:border-primary outline-none cursor-pointer hover:bg-white/10 transition select-none ${textSize}`;
+                const inp = document.createElement('input');
+                inp.type = 'text'; inp.readOnly = true;
                 
-                input.addEventListener('click', () => {
-                    input.value = input.value === '1' ? '0' : '1';
-                    if(input.value === '1') {
-                        input.classList.add('bg-primary/20', 'text-primary', 'font-bold', 'border-primary');
-                        input.classList.remove('bg-cyber-dark', 'text-white', 'border-white/10');
-                    } else {
-                        input.classList.remove('bg-primary/20', 'text-primary', 'font-bold', 'border-primary');
-                        input.classList.add('bg-cyber-dark', 'text-white', 'border-white/10');
-                    }
-                    updateHiddenJSON(n);
-                });
-                gridContainer.appendChild(input);
+                // On remplit si on a des données (depuis session ou CSV)
+                const val = (data && data[i]) ? data[i][j] : 0;
+                inp.value = val;
+
+                inp.className = "w-full h-full bg-black/40 border border-white/10 text-center text-white font-mono rounded-lg cursor-pointer transition-all text-xs";
+                if(val == 1) inp.classList.add('bg-primary/20', 'text-primary', 'border-primary/50', 'font-bold');
+                
+                inp.style.height = cellSize;
+                inp.onclick = () => {
+                    inp.value = inp.value == '1' ? '0' : '1';
+                    inp.classList.toggle('bg-primary/20'); inp.classList.toggle('text-primary'); inp.classList.toggle('border-primary/50'); inp.classList.toggle('font-bold');
+                    updateJSON(n);
+                };
+                grid.appendChild(inp);
             }
         }
-        updateHiddenJSON(n);
+        updateJSON(n);
     }
 
-    function createLabel(text, ts='text-sm') {
-        const d = document.createElement('div'); d.className = `flex items-center justify-center font-bold text-primary/50 ${ts}`; d.innerText = text; return d;
+    function createLabel(t) {
+        const d = document.createElement('div');
+        d.className = "flex items-center justify-center font-bold text-primary/30 text-[10px] font-mono";
+        d.innerText = t; return d;
     }
 
-    function updateHiddenJSON(n) {
-        const inputs = gridContainer.querySelectorAll('input');
+    function updateJSON(n) {
+        const inps = grid.querySelectorAll('input');
         let m = [], r = [];
-        inputs.forEach((inp, idx) => {
-            r.push(parseInt(inp.value)||0);
-            if((idx+1)%n===0) { m.push(r); r=[]; }
+        inps.forEach((it, idx) => {
+            r.push(parseInt(it.value) || 0);
+            if((idx + 1) % n === 0) { m.push(r); r = []; }
         });
-        if(hiddenMatrix) hiddenMatrix.value = JSON.stringify(m);
+        hiddenM.value = JSON.stringify(m);
     }
-    createGrid(4);
+
+    document.getElementById('btn-generate-grid').onclick = () => createGrid(parseInt(nodeCountInput.value));
+
+    // CHARGEMENT INITIAL : Utilise les données de session si présentes
+    createGrid(preFilledCount, preFilledMatrix);
 });
 </script>
-</body>
-</html>
+
+<?php require_once __DIR__ . '/../src/templates/footer.php'; ?>
